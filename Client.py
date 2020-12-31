@@ -2,11 +2,13 @@ import socket
 import threading
 from socket import *
 import getch
+import traceback
 
 
 class Client():
     def __init__(self, badass_team_name):
         self.TEAM_ROCKET = badass_team_name
+        self.running = False
         self.client_ip = gethostbyname(gethostname())
         if self.client_ip is None:
             print('error at receiving ip at Client init !')
@@ -14,17 +16,20 @@ class Client():
         self.broad_port = 13147
         self.UDP_SOCKET = socket(AF_INET, SOCK_DGRAM)
 
+
     def begin_client(self):
         #######################################
         # BEGIN THREADING
-        #######################################
-        print("BEGIN CLIENT")
-        thread = threading.Thread(target=self.begin_on_listenning)
-        thread.start()
+        ######################################
+        try:
+            thread = threading.Thread(target=self.begin_on_listenning)
+            thread.start()
+        except:
+            traceback.print_exc()
 
     def begin_on_listenning(self):
         port_tcp = None
-        print("Client started - listening for broadcasts...")
+        print("Client started, listening for offer requests...")
         #######################################
         # HERE: client begin accepting udp msg`s
         #######################################
@@ -48,7 +53,6 @@ class Client():
                 port_tcp = msg[0][5:]
 
             the_tcp_port_we_found = int.from_bytes(port_tcp, byteorder='big', signed=False)
-            print(the_tcp_port_we_found)
             if the_tcp_port_we_found is None:
                 print('error accord while cast tcp port from bytes')
             else:
@@ -58,9 +62,6 @@ class Client():
             print('error accord while tried to connect to udp socket')
 
     def connecting_to_TCP_server(self, tcp_port):
-        # print(port_tcp)
-        # print(type(port_tcp))
-
         #######################################
         # HERE: we creating a TCP connection.
         #######################################
@@ -96,12 +97,11 @@ class Client():
 
             print(respond_we_get_from_the_server)
             our_client_socket.settimeout(0.0)
-
+            self.running = True
             # after connecting to server, we are ready to send chars as bytes !
-            while True:
+            while self.running:
                 try:
                     # here we recieve massages from the server !
-                    self.recieve_from_server(client_socket=our_client_socket)
                     data = our_client_socket.recv(1024)
                     # check if data received correctly.
                     if data is None:
@@ -109,7 +109,7 @@ class Client():
                     # cast the data
                     data = str(data, 'utf-8')
                     print(data)
-                    break
+                    self.running = False
                 except:
                     try:
                         # catching keyboard clicks and seding it to the server with getch libary.
@@ -117,24 +117,22 @@ class Client():
                         if curr_ch is None:
                             print('invalid return from getch')
                         # sending clicks to server as bytes.
-                        our_client_socket.send(bytes(curr_ch,encoding = 'utf8'))
+                        try:
+                            our_client_socket.send(bytes(curr_ch,encoding = 'utf8'))
+                        except:
+                            data = our_client_socket.recv(1024)
+                            if data is None:
+                                print('error accord recieving the data from the server !')
+                                # cast the data
+                            data = str(data, 'utf-8')
+                            print(data)
+                            self.running = False
                     except:
-                        print('wasnt able to catch key board events -> TRY AGIAN !')
                         continue
             our_client_socket.close()
+            print("Server disconnected, listening for offer requests...")
 
         # outer try block, if reach here no tcp connection created.
         except Exception as e:
             print('wasnt able to create a tcp connection, check connection to tcp func at client')
             print(e)
-
-
-def begin():
-    client = Client("tom_N_dani")
-    if client is None:
-        print('issue with client at init')
-    client.begin_client()
-
-
-if __name__ == '__main__':
-    begin()
